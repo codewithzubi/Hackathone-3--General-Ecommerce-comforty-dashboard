@@ -1,17 +1,76 @@
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
+"use client"  // Marking this file as a client component
 
-const orders = [
-  { id: 1, customer: "John Doe", date: "2023-05-01", total: 599.95, status: "Delivered" },
-  { id: 2, customer: "Jane Smith", date: "2023-05-02", total: 299.97, status: "Processing" },
-  { id: 3, customer: "Bob Johnson", date: "2023-05-03", total: 899.93, status: "Shipped" },
-  { id: 4, customer: "Alice Brown", date: "2023-05-04", total: 199.98, status: "Pending" },
-  { id: 5, customer: "Charlie Davis", date: "2023-05-05", total: 499.96, status: "Delivered" },
-]
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { client } from "../../../sanity/lib/sanity";
+
+// Define the Product interface (update as necessary)
+interface Product {
+  _id: string; // Assuming each product has an ID
+  name: string;
+  price: number;
+  // Add any other fields that are part of the product
+}
+
+// Define the Order interface
+interface Order {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  total: number;
+  status: string;
+  _createdAt: string;
+  cartItems: { quantity: number; product: Product }[]; // Updated 'product' type
+}
+
+const fetchOrders = async (): Promise<Order[]> => {
+  const orders = await client.fetch(`
+    *[_type == "order"] | order(_createdAt desc) {
+      _id,
+      firstName,
+      lastName,
+      email,
+      total,
+      status,
+      _createdAt,
+      cartItems[] {
+        quantity,
+        "product": product->
+      }
+    }
+  `);
+  return orders;
+};
 
 export default function OrdersPage() {
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  // Using useEffect to fetch orders asynchronously after the component mounts
+  useEffect(() => {
+    const loadOrders = async () => {
+      setLoading(true);
+      try {
+        const fetchedOrders = await fetchOrders();
+        setOrders(fetchedOrders);
+      } catch (error) {
+        console.error("Error fetching orders:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadOrders();
+  }, []);
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -26,7 +85,9 @@ export default function OrdersPage() {
           <TableRow>
             <TableHead>Order ID</TableHead>
             <TableHead>Customer</TableHead>
+            <TableHead>Email</TableHead>
             <TableHead>Date</TableHead>
+            <TableHead>Items</TableHead>
             <TableHead>Total</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Actions</TableHead>
@@ -34,25 +95,47 @@ export default function OrdersPage() {
         </TableHeader>
         <TableBody>
           {orders.map((order) => (
-            <TableRow key={order.id}>
-              <TableCell>#{order.id}</TableCell>
-              <TableCell>{order.customer}</TableCell>
-              <TableCell>{order.date}</TableCell>
+            <TableRow key={order._id}>
+              <TableCell>#{order._id.slice(-5)}</TableCell>
+              <TableCell>{`${order.firstName} ${order.lastName}`}</TableCell>
+              <TableCell>{order.email}</TableCell>
+              <TableCell>{new Date(order._createdAt).toLocaleDateString()}</TableCell>
+              <TableCell>{order.cartItems.length} items</TableCell>
               <TableCell>${order.total.toFixed(2)}</TableCell>
               <TableCell>
-                <Badge variant={order.status === "Delivered" ? "secondary" : "default"}>
+                <Badge
+                  variant={order.status === "success" ? "default" : order.status === "pending" ? "outline" : "secondary"}
+                >
                   {order.status}
                 </Badge>
               </TableCell>
               <TableCell>
                 <Button variant="ghost" size="sm">
-                  View
+                  View Details
                 </Button>
+                <ClientButton /> {/* Marking the button as a Client Component */}
               </TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
     </div>
-  )
+  );
+}
+
+// Separate Client Button component to handle interactivity
+function ClientButton() {
+  const handleUpdate = () => {
+    // Your logic for updating the order status
+  };
+
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={handleUpdate}
+    >
+      Update Status
+    </Button>
+  );
 }

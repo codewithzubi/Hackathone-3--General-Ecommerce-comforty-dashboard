@@ -11,6 +11,7 @@ interface Sale {
   email: string
   total: number
   status: string
+  _createdAt: string
 }
 
 export function RecentSales() {
@@ -25,7 +26,8 @@ export function RecentSales() {
           lastName,
           email,
           total,
-          status
+          status,
+          _createdAt
         }
       `)
       setRecentSales(result)
@@ -48,7 +50,15 @@ export function RecentSales() {
           </div>
           <div className="ml-auto text-sm">
             <p className="font-medium">${sale.total.toFixed(2)}</p>
-            <p className={`text-xs ${sale.status === "success" ? "text-green-500" : "text-orange-500"}`}>
+            <p
+              className={`text-xs ${
+                sale.status === "success"
+                  ? "text-green-500"
+                  : sale.status === "pending"
+                    ? "text-orange-500"
+                    : "text-blue-500"
+              }`}
+            >
               {sale.status}
             </p>
           </div>

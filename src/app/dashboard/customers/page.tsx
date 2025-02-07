@@ -2,16 +2,68 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { UserPlus } from "lucide-react"
+import { client } from "../../../sanity/lib/sanity"
 
-const customers = [
-  { id: 1, name: "John Doe", email: "john@example.com", orders: 5, totalSpent: 599.95 },
-  { id: 2, name: "Jane Smith", email: "jane@example.com", orders: 3, totalSpent: 299.97 },
-  { id: 3, name: "Bob Johnson", email: "bob@example.com", orders: 7, totalSpent: 899.93 },
-  { id: 4, name: "Alice Brown", email: "alice@example.com", orders: 2, totalSpent: 199.98 },
-  { id: 5, name: "Charlie Davis", email: "charlie@example.com", orders: 4, totalSpent: 499.96 },
-]
+// Define the types for the customer and accumulator
+interface Customer {
+  id: string
+  firstName: string
+  lastName: string
+  email: string
+  totalOrders: number
+  totalSpent: number
+  lastOrderDate: string
+}
 
-export default function CustomersPage() {
+interface Order {
+  _id: string
+  firstName: string
+  lastName: string
+  email: string
+  total: number
+  _createdAt: string
+}
+
+async function getCustomers() {
+  // Get all orders first
+  const orders: Order[] = await client.fetch(`
+    *[_type == "order"] {
+      _id,
+      firstName,
+      lastName,
+      email,
+      total,
+      _createdAt
+    }
+  `)
+
+  // Group orders by customer email to get unique customers with their order history
+  const customersMap = orders.reduce((acc: { [email: string]: Customer }, order: Order) => {
+    const email = order.email
+    if (!acc[email]) {
+      acc[email] = {
+        id: order._id,
+        firstName: order.firstName,
+        lastName: order.lastName,
+        email: email,
+        totalOrders: 0,
+        totalSpent: 0,
+        lastOrderDate: order._createdAt,
+      }
+    }
+    acc[email].totalOrders += 1
+    acc[email].totalSpent += order.total
+    acc[email].lastOrderDate =
+      new Date(order._createdAt) > new Date(acc[email].lastOrderDate) ? order._createdAt : acc[email].lastOrderDate
+    return acc
+  }, {})
+
+  return Object.values(customersMap)
+}
+
+export default async function CustomersPage() {
+  const customers = await getCustomers()
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -29,24 +81,26 @@ export default function CustomersPage() {
           <TableRow>
             <TableHead>Name</TableHead>
             <TableHead>Email</TableHead>
-            <TableHead>Orders</TableHead>
+            <TableHead>Total Orders</TableHead>
             <TableHead>Total Spent</TableHead>
+            <TableHead>Last Order</TableHead>
             <TableHead>Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {customers.map((customer) => (
+          {customers.map((customer: Customer) => (
             <TableRow key={customer.id}>
-              <TableCell>{customer.name}</TableCell>
+              <TableCell>{`${customer.firstName} ${customer.lastName}`}</TableCell>
               <TableCell>{customer.email}</TableCell>
-              <TableCell>{customer.orders}</TableCell>
+              <TableCell>{customer.totalOrders}</TableCell>
               <TableCell>${customer.totalSpent.toFixed(2)}</TableCell>
+              <TableCell>{new Date(customer.lastOrderDate).toLocaleDateString()}</TableCell>
               <TableCell>
                 <Button variant="ghost" size="sm">
-                  View
+                  View Details
                 </Button>
                 <Button variant="ghost" size="sm">
-                  Edit
+                  Order History
                 </Button>
               </TableCell>
             </TableRow>
@@ -56,4 +110,3 @@ export default function CustomersPage() {
     </div>
   )
 }
-
