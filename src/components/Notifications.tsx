@@ -28,22 +28,24 @@ export function Notifications() {
   useEffect(() => {
     // Fetch notifications from API
     const fetchNotifications = async () => {
-      const response = await fetch("/api/notifications")
-      const data = await response.json()
-      setNotifications(data)
+      try {
+        const response = await fetch("/api/notifications")
+        if (response.ok) {
+          const data = await response.json()
+          setNotifications(data)
+        }
+      } catch (error) {
+        console.error("Failed to fetch notifications:", error)
+      }
     }
 
     fetchNotifications()
 
-    // Set up WebSocket connection for real-time updates
-    const socket = new WebSocket("ws://your-websocket-url")
-    socket.onmessage = (event) => {
-      const newNotification = JSON.parse(event.data)
-      setNotifications((prev) => [newNotification, ...prev])
-    }
+    // Poll for new notifications every minute
+    const intervalId = setInterval(fetchNotifications, 60000)
 
     return () => {
-      socket.close()
+      clearInterval(intervalId)
     }
   }, [])
 
@@ -53,8 +55,6 @@ export function Notifications() {
     } else if (notification.type === "low_stock") {
       router.push("/dashboard/products")
     }
-    // Mark notification as read
-    // You would typically call an API here to update the notification status
   }
 
   return (
@@ -74,12 +74,16 @@ export function Notifications() {
         <DropdownMenuLabel>Notifications</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          {notifications.map((notification) => (
-            <DropdownMenuItem key={notification.id} onClick={() => handleNotificationClick(notification)}>
-              {notification.message}
-              <span className="ml-auto text-xs text-muted-foreground">{notification.timestamp}</span>
-            </DropdownMenuItem>
-          ))}
+          {notifications.length === 0 ? (
+            <DropdownMenuItem className="text-center text-muted-foreground">No new notifications</DropdownMenuItem>
+          ) : (
+            notifications.map((notification) => (
+              <DropdownMenuItem key={notification.id} onClick={() => handleNotificationClick(notification)}>
+                {notification.message}
+                <span className="ml-auto text-xs text-muted-foreground">{notification.timestamp}</span>
+              </DropdownMenuItem>
+            ))
+          )}
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem className="justify-center" onClick={() => router.push("/dashboard/notifications")}>
